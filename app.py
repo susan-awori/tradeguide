@@ -6,7 +6,7 @@ from google import genai
 API_KEY = os.environ.get("GEMINI_API_KEY", "PASTE_YOUR_KEY_HERE")
 
 client = genai.Client(api_key=API_KEY)
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-3.8-flash"
 
 # ---- 2. SOURCE SNIPPETS (your "RAG corpus") ----
 SOURCES = [
@@ -121,11 +121,11 @@ with gr.Blocks(title="TradePass") as demo:
         send = gr.Button("Send", variant="primary")
         clear = gr.Button("Clear")
 
-def respond(user_message, chat_history):
-    chat_history = chat_history or []
-    answer = answer_question(user_message, chat_history)
-    chat_history.append((user_message, answer))
-    return "", chat_history
+    def respond(user_message, chat_history):
+        chat_history = chat_history or []
+        answer = answer_question(user_message, chat_history)
+        chat_history.append((user_message, answer))
+        return "", chat_history
 
     msg.submit(respond, [msg, chatbot], [msg, chatbot])
     send.click(respond, [msg, chatbot], [msg, chatbot])
