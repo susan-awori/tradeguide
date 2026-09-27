@@ -167,6 +167,8 @@ def format_error(e):
     )
 
 
+import time  # add this with your other imports at the top
+
 def answer_question(user_question, history):
     if not user_question or not user_question.strip():
         return "Please describe what you want to export (product, quantity, from-country, to-country)."
@@ -175,14 +177,20 @@ def answer_question(user_question, history):
     history_block = format_history(history)
     full_prompt = f"{system_prompt}{history_block}\n\nTRADER QUESTION:\n{user_question}"
 
-    try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=full_prompt,
-        )
-        return response.text
-    except Exception as e:
-        return format_error(e)
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=full_prompt,
+            )
+            return response.text
+        except Exception as e:
+            if "503" in str(e) or "UNAVAILABLE" in str(e):
+                if attempt < max_retries:
+                    time.sleep(3)
+                    continue
+            return format_error(e)
 
 
 def respond(user_message, chat_history):
