@@ -6,7 +6,7 @@ from google import genai
 # ---- 1. SET YOUR API KEY ----
 API_KEY = os.environ.get("GEMINI_API_KEY", "PASTE_YOUR_KEY_HERE")
 client = genai.Client(api_key=API_KEY)
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-2.5-flash"
 
 # ---- Logger (server-side technical detail capture) ----
 logger = logging.getLogger("tradepass")
