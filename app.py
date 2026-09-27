@@ -117,7 +117,9 @@ with gr.Blocks(title="TradePass") as demo:
         label="Describe your export",
         placeholder="e.g. I want to export 200kg of processed avocado oil from Kenya to Uganda",
     )
-    clear = gr.Button("Clear")
+    with gr.Row():
+        send = gr.Button("Send", variant="primary")
+        clear = gr.Button("Clear")
 
 def respond(user_message, chat_history):
     chat_history = chat_history or []
@@ -126,6 +128,7 @@ def respond(user_message, chat_history):
     return "", chat_history
 
     msg.submit(respond, [msg, chatbot], [msg, chatbot])
+    send.click(respond, [msg, chatbot], [msg, chatbot])
     clear.click(lambda: None, None, chatbot, queue=False)
 
 if __name__ == "__main__":
