@@ -6,7 +6,7 @@ from google import genai
 # ---- 1. SET YOUR API KEY ----
 API_KEY = os.environ.get("GEMINI_API_KEY", "PASTE_YOUR_KEY_HERE")
 client = genai.Client(api_key=API_KEY)
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-3.8-flash"
 
 # ---- Logger (server-side technical detail capture) ----
 logger = logging.getLogger("tradepass")
@@ -63,6 +63,29 @@ SOURCES = [
             "and may be applied inconsistently at different border posts."
         ),
     },
+
+        {
+        "id": "KTDA-TEA-1",
+        "title": "Kenya Tea Development Agency / KRA - Tea Export Basics",
+        "text": (
+            "Tea exports from Kenya typically require a KRA PIN, an export entry declaration, a Certificate of "
+            "Origin (AfCFTA or COMESA), a commercial invoice, and a packing list. Tea intended for AfCFTA "
+            "preferential tariffs must be wholly grown and processed within an AfCFTA member state, and traders "
+            "should confirm current grading and quality certification requirements with the Tea Board of Kenya "
+            "before export."
+        ),
+    },
+    {
+        "id": "KEBS-TEXTILE-1",
+        "title": "Kenya Bureau of Standards / EAC - Textile Export Basics",
+        "text": (
+            "Textile and garment exports generally require a Certificate of Origin, a commercial invoice, a "
+            "packing list, and a KEBS certificate of conformity confirming the goods meet quality standards. "
+            "To qualify for AfCFTA preferential tariffs, textiles usually need to meet a rule of origin based on "
+            "a specified percentage of local value addition or a qualifying change in tariff classification, "
+            "since many textile inputs (e.g. raw fabric) may be imported from outside Africa."
+        ),
+    },
 ]
 
 
@@ -94,11 +117,12 @@ def format_history(history):
     if not history:
         return ""
     lines = []
-    for user_msg, assistant_msg in history:
-        if user_msg:
-            lines.append(f"TRADER (previous): {user_msg}")
-        if assistant_msg:
-            lines.append(f"TRADEPASS (previous): {assistant_msg}")
+    for msg in history:
+        if isinstance(msg, dict):
+            role = "TRADER (previous)" if msg.get("role") == "user" else "TRADEPASS (previous)"
+            content = msg.get("content", "")
+            if content:
+                lines.append(f"{role}: {content}")
     if not lines:
         return ""
     return "\n\nCONVERSATION SO FAR:\n" + "\n".join(lines) + "\n"
@@ -135,7 +159,6 @@ def format_error(e):
             "The AI couldn't safely answer that request. Try rephrasing your question.\n\n"
             "_Technical details have been logged._"
         )
-    # Fallback
     return (
         "⚠️ **Something went wrong**\n\n"
         "TradePass couldn't generate a response. Please try again. "
@@ -162,6 +185,18 @@ def answer_question(user_question, history):
         return format_error(e)
 
 
+def respond(user_message, chat_history):
+    chat_history = chat_history or []
+    answer = answer_question(user_message, chat_history)
+    chat_history.append({"role": "user", "content": user_message})
+    chat_history.append({"role": "assistant", "content": answer})
+    return "", chat_history
+
+
+def clear_chat():
+    return []
+
+
 with gr.Blocks(title="TradePass") as demo:
     gr.Markdown(
         """
@@ -176,17 +211,14 @@ with gr.Blocks(title="TradePass") as demo:
         label="Describe your export",
         placeholder="e.g. I want to export 200kg of processed avocado oil from Kenya to Uganda",
     )
-    clear = gr.Button("Clear")
-
-    def respond(user_message, chat_history):
-        chat_history = chat_history or []
-        answer = answer_question(user_message, chat_history)
-        chat_history.append((user_message, answer))
-        return "", chat_history
+    with gr.Row():
+        send = gr.Button("Send", variant="primary")
+        clear = gr.Button("Clear")
 
     msg.submit(respond, [msg, chatbot], [msg, chatbot])
-    clear.click(lambda: None, None, chatbot, queue=False)
+    send.click(respond, [msg, chatbot], [msg, chatbot])
+    clear.click(clear_chat, None, chatbot, queue=False)
 
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
