@@ -1,12 +1,16 @@
 import os
+import logging
 import gradio as gr
 from google import genai
 
 # ---- 1. SET YOUR API KEY ----
 API_KEY = os.environ.get("GEMINI_API_KEY", "PASTE_YOUR_KEY_HERE")
-
 client = genai.Client(api_key=API_KEY)
 MODEL = "gemini-2.0-flash"
+
+# ---- Logger (server-side technical detail capture) ----
+logger = logging.getLogger("tradepass")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
 # ---- 2. SOURCE SNIPPETS (your "RAG corpus") ----
 SOURCES = [
@@ -61,15 +65,15 @@ SOURCES = [
     },
 ]
 
+
 def build_context():
     return "\n\n".join(f"[{s['id']}] {s['title']}:\n{s['text']}" for s in SOURCES)
 
+
 SYSTEM_PROMPT = """You are TradePass, an AI assistant that helps small traders in Africa understand what \
 documents they need and whether their product likely qualifies for AfCFTA preferential tariffs.
-
 You must ONLY use the SOURCE SNIPPETS given below. Do not invent tariff rates, laws, or requirements that are \
 not in the sources.
-
 Rules:
 1. Always answer in this structure:
    - **Documents likely needed:** (bullet list)
@@ -80,17 +84,73 @@ Rules:
 in my current sources — please confirm with your local customs authority or trade office." Do not guess.
 3. Keep the tone practical and simple, for someone who may not be a trade expert.
 4. This is general guidance, not legal or customs advice — always end with that one-line disclaimer.
-
 SOURCE SNIPPETS:
 {context}
 """
+
+
+def format_history(history):
+    """Turn Gradio chat history into a transcript the model can read."""
+    if not history:
+        return ""
+    lines = []
+    for user_msg, assistant_msg in history:
+        if user_msg:
+            lines.append(f"TRADER (previous): {user_msg}")
+        if assistant_msg:
+            lines.append(f"TRADEPASS (previous): {assistant_msg}")
+    if not lines:
+        return ""
+    return "\n\nCONVERSATION SO FAR:\n" + "\n".join(lines) + "\n"
+
+
+def format_error(e):
+    """Categorize API/SDK exceptions into user-friendly messages; log full detail server-side."""
+    msg = str(e).lower()
+    logger.exception("Gemini API call failed")
+
+    if "api key" in msg or "unauthenticated" in msg or "401" in msg or "403" in msg:
+        return (
+            "⚠️ **Authentication failed**\n\n"
+            "Your Gemini API key is missing, invalid, or lacks permission. "
+            "Set the `GEMINI_API_KEY` environment variable to a valid key and restart the app.\n\n"
+            "_Technical details have been logged._"
+        )
+    if "rate limit" in msg or "429" in msg or "quota" in msg or "resource_exhausted" in msg:
+        return (
+            "⚠️ **Rate limit reached**\n\n"
+            "You've hit the Gemini API quota or rate limit. Please wait a minute and try again. "
+            "If this keeps happening, check your plan/billing in Google AI Studio.\n\n"
+            "_Technical details have been logged._"
+        )
+    if any(k in msg for k in ["connection", "timeout", "network", "unreachable", "dns"]):
+        return (
+            "⚠️ **Connection problem**\n\n"
+            "Couldn't reach the AI service. Check your internet connection and try again.\n\n"
+            "_Technical details have been logged._"
+        )
+    if "safety" in msg or "blocked" in msg or "recitation" in msg:
+        return (
+            "⚠️ **Response blocked**\n\n"
+            "The AI couldn't safely answer that request. Try rephrasing your question.\n\n"
+            "_Technical details have been logged._"
+        )
+    # Fallback
+    return (
+        "⚠️ **Something went wrong**\n\n"
+        "TradePass couldn't generate a response. Please try again. "
+        "If the problem persists, contact the app administrator.\n\n"
+        f"_Technical details (for admins):_ `{e}`"
+    )
+
 
 def answer_question(user_question, history):
     if not user_question or not user_question.strip():
         return "Please describe what you want to export (product, quantity, from-country, to-country)."
 
-    prompt = SYSTEM_PROMPT.format(context=build_context())
-    full_prompt = f"{prompt}\n\nTRADER QUESTION:\n{user_question}"
+    system_prompt = SYSTEM_PROMPT.format(context=build_context())
+    history_block = format_history(history)
+    full_prompt = f"{system_prompt}{history_block}\n\nTRADER QUESTION:\n{user_question}"
 
     try:
         response = client.models.generate_content(
@@ -99,7 +159,7 @@ def answer_question(user_question, history):
         )
         return response.text
     except Exception as e:
-        return f"⚠️ Error calling the AI model: {e}\n\nCheck your API key and internet connection."
+        return format_error(e)
 
 
 with gr.Blocks(title="TradePass") as demo:
@@ -108,7 +168,6 @@ with gr.Blocks(title="TradePass") as demo:
         # 🌍 TradePass
         **Ask what you need to export your product across African borders — get a document checklist,
         an AfCFTA qualification check, and a next step. Powered by AI, grounded in official trade sources.**
-
         *Prototype scope: Kenya ↔ Uganda corridor, processed food products. Not legal or customs advice.*
         """
     )
@@ -119,14 +178,15 @@ with gr.Blocks(title="TradePass") as demo:
     )
     clear = gr.Button("Clear")
 
-def respond(user_message, chat_history):
-    chat_history = chat_history or []
-    answer = answer_question(user_message, chat_history)
-    chat_history.append((user_message, answer))
-    return "", chat_history
+    def respond(user_message, chat_history):
+        chat_history = chat_history or []
+        answer = answer_question(user_message, chat_history)
+        chat_history.append((user_message, answer))
+        return "", chat_history
 
     msg.submit(respond, [msg, chatbot], [msg, chatbot])
     clear.click(lambda: None, None, chatbot, queue=False)
+
 
 if __name__ == "__main__":
     demo.launch()
