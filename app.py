@@ -61,8 +61,10 @@ SOURCES = [
     },
 ]
 
+
 def build_context():
     return "\n\n".join(f"[{s['id']}] {s['title']}:\n{s['text']}" for s in SOURCES)
+
 
 SYSTEM_PROMPT = """You are TradePass, an AI assistant that helps small traders in Africa understand what \
 documents they need and whether their product likely qualifies for AfCFTA preferential tariffs.
@@ -85,7 +87,8 @@ SOURCE SNIPPETS:
 {context}
 """
 
-def answer_question(user_question, history):
+
+def answer_question(user_question):
     if not user_question or not user_question.strip():
         return "Please describe what you want to export (product, quantity, from-country, to-country)."
 
@@ -100,6 +103,18 @@ def answer_question(user_question, history):
         return response.text
     except Exception as e:
         return f"⚠️ Error calling the AI model: {e}\n\nCheck your API key and internet connection."
+
+
+def respond(user_message, chat_history):
+    chat_history = chat_history or []
+    answer = answer_question(user_message)
+    chat_history.append({"role": "user", "content": user_message})
+    chat_history.append({"role": "assistant", "content": answer})
+    return "", chat_history
+
+
+def clear_chat():
+    return []
 
 
 with gr.Blocks(title="TradePass") as demo:
@@ -121,15 +136,9 @@ with gr.Blocks(title="TradePass") as demo:
         send = gr.Button("Send", variant="primary")
         clear = gr.Button("Clear")
 
-    def respond(user_message, chat_history):
-        chat_history = chat_history or []
-        answer = answer_question(user_message, chat_history)
-        chat_history.append((user_message, answer))
-        return "", chat_history
-
     msg.submit(respond, [msg, chatbot], [msg, chatbot])
     send.click(respond, [msg, chatbot], [msg, chatbot])
-    clear.click(lambda: None, None, chatbot, queue=False)
+    clear.click(clear_chat, None, chatbot, queue=False)
 
 if __name__ == "__main__":
     demo.launch()
