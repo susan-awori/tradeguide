@@ -59,6 +59,29 @@ SOURCES = [
             "and may be applied inconsistently at different border posts."
         ),
     },
+
+        {
+        "id": "KTDA-TEA-1",
+        "title": "Kenya Tea Development Agency / KRA - Tea Export Basics",
+        "text": (
+            "Tea exports from Kenya typically require a KRA PIN, an export entry declaration, a Certificate of "
+            "Origin (AfCFTA or COMESA), a commercial invoice, and a packing list. Tea intended for AfCFTA "
+            "preferential tariffs must be wholly grown and processed within an AfCFTA member state, and traders "
+            "should confirm current grading and quality certification requirements with the Tea Board of Kenya "
+            "before export."
+        ),
+    },
+    {
+        "id": "KEBS-TEXTILE-1",
+        "title": "Kenya Bureau of Standards / EAC - Textile Export Basics",
+        "text": (
+            "Textile and garment exports generally require a Certificate of Origin, a commercial invoice, a "
+            "packing list, and a KEBS certificate of conformity confirming the goods meet quality standards. "
+            "To qualify for AfCFTA preferential tariffs, textiles usually need to meet a rule of origin based on "
+            "a specified percentage of local value addition or a qualifying change in tariff classification, "
+            "since many textile inputs (e.g. raw fabric) may be imported from outside Africa."
+        ),
+    },
 ]
 
 
